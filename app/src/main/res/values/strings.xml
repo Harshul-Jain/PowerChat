@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">PowerChat</string>
+    <string name="mbn_req">Please enter your mobile number.You will get a SMS including a verification code.</string>
 </resources>

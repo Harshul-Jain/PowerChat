@@ -3,4 +3,5 @@
     <string name="mbn_req">Please enter your mobile number.You will get a SMS including a verification code.</string>
     <string name="verify_number">\"Verify %s \"</string>
     <string name="waiting_text">Waiting to automatically detect an SMS sent to\n %s Wrong Number?</string>
+    <string name="second_remaining">Seconds Remaining: %d</string>
 </resources>

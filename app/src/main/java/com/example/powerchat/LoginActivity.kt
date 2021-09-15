@@ -1,6 +1,7 @@
 package com.example.powerchat
 
 import android.content.DialogInterface
+import android.content.Intent
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import androidx.core.widget.addTextChangedListener
@@ -13,6 +14,7 @@ class LoginActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_login)
+        //1.Add Hint Request for Phone Number
         phoneNumberEt.addTextChangedListener {
             nextBtn.isEnabled = !(it.isNullOrEmpty() || it.length < 10)
         }
@@ -47,6 +49,7 @@ class LoginActivity : AppCompatActivity() {
     }
 
     private fun showOtpActivity() {
-
+        startActivity(Intent(this, OtpActivity::class.java).putExtra(PHONE_NUMBER, phoneNumber))
+        finish()
     }
 }

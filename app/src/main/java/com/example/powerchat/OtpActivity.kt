@@ -16,12 +16,10 @@ import android.text.style.ClickableSpan
 import android.util.Log
 import android.view.View
 import androidx.core.view.isVisible
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.firebase.FirebaseException
 import com.google.firebase.FirebaseTooManyRequestsException
-import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
-import com.google.firebase.auth.PhoneAuthCredential
-import com.google.firebase.auth.PhoneAuthOptions
-import com.google.firebase.auth.PhoneAuthProvider
+import com.google.firebase.auth.*
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
 import kotlinx.android.synthetic.main.activity_otp.*
@@ -30,18 +28,19 @@ import java.util.concurrent.TimeUnit
 
 const val PHONE_NUMBER = "phoneNumber"
 
-class OtpActivity : AppCompatActivity() {
+class OtpActivity : AppCompatActivity(), View.OnClickListener {
     lateinit var callbacks: PhoneAuthProvider.OnVerificationStateChangedCallbacks
     var phoneNumber: String? = null
     var mVerificationId: String? = null
     var mResendToken: PhoneAuthProvider.ForceResendingToken? = null
+    private lateinit var progressDialog: ProgressDialog
+    private var mCounterDown: CountDownTimer? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_otp)
         initViews()
         startVerify()
-
     }
 
     private fun startVerify() {
@@ -53,12 +52,14 @@ class OtpActivity : AppCompatActivity() {
             .build()
         PhoneAuthProvider.verifyPhoneNumber(options)
         showTimer(60000)
+        progressDialog = createProgressDialog("Sending a verification code", false)
+        progressDialog.show()
 
     }
 
     private fun showTimer(milliSecInFuture: Long) {
         resendBtn.isEnabled = false
-        object : CountDownTimer(milliSecInFuture, 1000) {
+        mCounterDown = object : CountDownTimer(milliSecInFuture, 1000) {
             override fun onTick(millisUntilFinished: Long) {
                 counterTv.isVisible = true
                 counterTv.text = getString(R.string.second_remaining, millisUntilFinished / 1000)
@@ -71,10 +72,20 @@ class OtpActivity : AppCompatActivity() {
         }.start()
     }
 
+    override fun onDestroy() {
+        super.onDestroy()
+        if (mCounterDown != null) {
+            mCounterDown!!.cancel()
+        }
+    }
+
     private fun initViews() {
         phoneNumber = intent.getStringExtra(PHONE_NUMBER)
         verifyTv.text = getString(R.string.verify_number, phoneNumber)
         setSpannableString()
+
+        verificationBtn.setOnClickListener(this)
+        resendBtn.setOnClickListener(this)
 
         callbacks = object : PhoneAuthProvider.OnVerificationStateChangedCallbacks() {
 
@@ -86,10 +97,13 @@ class OtpActivity : AppCompatActivity() {
                 //     detect the incoming verification SMS and perform verification without
                 //     user action.
                 Log.d(TAG, "onVerificationCompleted:$credential")
+                if (::progressDialog.isInitialized) {
+                    progressDialog.dismiss()
+                }
                 val smsCode: String? = credential.smsCode
                 if (!smsCode.isNullOrBlank())
                     sentcodeEt.setText(smsCode)
-                signInWithPhoneAuthCredential(credential)
+                //  signInWithPhoneAuthCredential(credential)
             }
 
             override fun onVerificationFailed(e: FirebaseException) {
@@ -104,6 +118,8 @@ class OtpActivity : AppCompatActivity() {
                 }
 
                 // Show a message and update the UI
+                Log.e("ERROR_FIREBASE", e.localizedMessage)
+                notifyUserAndRetry("Your Phone Number might be wrong or connection error.Retry again!")
             }
 
             override fun onCodeSent(
@@ -122,8 +138,33 @@ class OtpActivity : AppCompatActivity() {
         }
     }
 
+    private fun notifyUserAndRetry(message: String) {
+        MaterialAlertDialogBuilder(this).apply {
+            setMessage(message)
+            setPositiveButton("Ok") { _, _ ->
+                showLoginActivity()
+            }
+
+            setNegativeButton("Cancel") { dialog, _ ->
+                dialog.dismiss()
+            }
+            setCancelable(false)
+            create()
+            show()
+        }
+    }
+
     private fun signInWithPhoneAuthCredential(credential: PhoneAuthCredential) {
 
+        val mAuth = FirebaseAuth.getInstance()
+        mAuth.signInWithCredential(credential)
+            .addOnCompleteListener {
+                if (it.isSuccessful) {
+
+                } else {
+                    notifyUserAndRetry("Your Phone Number verification failed.Try Again !!")
+                }
+            }
     }
 
     private fun setSpannableString() {
@@ -155,6 +196,38 @@ class OtpActivity : AppCompatActivity() {
 
     override fun onBackPressed() {
 
+    }
+
+    override fun onClick(v: View?) {
+        when (v) {
+            verificationBtn -> {
+                val code = sentcodeEt.text.toString()
+                if (code.isNotEmpty() && !mVerificationId.isNullOrBlank()) {
+                    progressDialog = createProgressDialog("Please wait....", false)
+                    progressDialog.show()
+                    val credential = PhoneAuthProvider.getCredential(mVerificationId!!, code)
+                    signInWithPhoneAuthCredential(credential)
+                }
+            }
+            resendBtn -> {
+                val code = sentcodeEt.text.toString()
+                if (mResendToken != null) {
+                    showTimer(60000)
+                    progressDialog = createProgressDialog("Sending a verification Code", false)
+                    progressDialog.show()
+
+                    val options = PhoneAuthOptions.newBuilder(Firebase.auth)
+                        .setPhoneNumber(phoneNumber!!)       // Phone number to verify
+                        .setTimeout(60L, TimeUnit.SECONDS) // Timeout and unit
+                        .setActivity(this)                 // Activity (for callback binding)
+                        .setCallbacks(callbacks)          // OnVerificationStateChangedCallbacks
+                        .setForceResendingToken(mResendToken!!)
+                        .build()
+                    PhoneAuthProvider.verifyPhoneNumber(options)
+                }
+            }
+
+        }
     }
 }
 

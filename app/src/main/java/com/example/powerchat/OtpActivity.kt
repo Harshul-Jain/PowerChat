@@ -132,6 +132,9 @@ class OtpActivity : AppCompatActivity(), View.OnClickListener {
                 Log.d(TAG, "onCodeSent:$verificationId")
 
                 // Save verification ID and resending token so we can use them later
+                if (::progressDialog.isInitialized) {
+                    progressDialog.dismiss()
+                }
                 mVerificationId = verificationId
                 mResendToken = token
             }
@@ -160,7 +163,13 @@ class OtpActivity : AppCompatActivity(), View.OnClickListener {
         mAuth.signInWithCredential(credential)
             .addOnCompleteListener {
                 if (it.isSuccessful) {
+                    startActivity(
+                        Intent(this, SignUpActivity::class.java).putExtra(
+                            PHONE_NUMBER,
+                            phoneNumber
+                        )
 
+                    )
                 } else {
                     notifyUserAndRetry("Your Phone Number verification failed.Try Again !!")
                 }
